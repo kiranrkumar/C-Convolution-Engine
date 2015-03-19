@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  testConv.c
+ *       Filename:  convEngine.c
  *
  *    Description:  Testing convolution of real-time input
  *                  Using functionality from delay.c and shifter.c from MPATE-GE 2618
@@ -51,7 +51,6 @@ typedef struct {
     SF_INFO sf_outinfo;
     
     //impulse responses
-    SF_INFO ir_info;
     SF_INFO irLeft_info;
     SF_INFO irRight_info;
 
@@ -74,7 +73,15 @@ typedef struct {
 } paData;
 
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
-void initBuffers();
+
+void initBuffers()
+{
+	for (int i = 0; i < BUFFERSIZE_MAX; i++)
+	{
+		RESULTBUFFER_LEFT[i] = 0;
+		RESULTBUFFER_RIGHT[i] = 0;
+	}
+}
 
 /*********************************************** 
  ***********************************************
@@ -472,13 +479,4 @@ void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INF
     data->irRightBuffer = irRightBuffer;
 	data->irLeft_len = irLeftLen;
 	data->irRight_len = irRightLen;
-}
-
-void initBuffers()
-{
-	for (int i = 0; i < BUFFERSIZE_MAX; i++)
-	{
-		RESULTBUFFER_LEFT[i] = 0;
-		RESULTBUFFER_RIGHT[i] = 0;
-	}
 }

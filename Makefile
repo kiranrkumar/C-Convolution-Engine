@@ -7,11 +7,11 @@ CC      = gcc
 CFLAGS  = -g -std=c99 -Wall -I/usr/local/djbfft/include
 LIBS = -lportaudio -lsndfile -lfftw3 -lncurses
 
-EXE  = testConv
+EXE  = convEngine
 
 HDRS = convolve.h
 
-SRCS = testConv.c convolve.c
+SRCS = convEngine.c convolve.c
 
 all: $(EXE)
 
