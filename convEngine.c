@@ -19,7 +19,7 @@
  */
 
 #define SAMPLE_RATE         44100
-#define FRAMES_PER_BUFFER   1024
+#define FRAMES_PER_BUFFER   64
 #define NUM_IN_CHANNELS     1
 #define NUM_OUT_CHANNELS    2
 #define BUFFERSIZE_MAX      (SAMPLE_RATE * 10 * NUM_OUT_CHANNELS) //assume  (IR length + framesPerBuffer) is not longer than 10 seconds
@@ -59,10 +59,10 @@ typedef struct {
     
     double *window; //for windowing the signals prior to FFT
 
-    int ir_len;
+    //int ir_len;
     int irLeft_len;
     int irRight_len;
-    double *irBuffer;
+    //double *irBuffer;
     double *irLeftBuffer;
     double *irRightBuffer;
 
@@ -140,11 +140,6 @@ static int paCallback( const void *inputBuffer,
 
         inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
         inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
-    }
-
-    //Check to see if we're at the end of the impulse response (IR)
-    if ( (( irIx + framesPerBuffer ) > data->ir_len) ) {
-        endOfIR = true;
     }
     
     // Convolve signals via convolution function
@@ -291,19 +286,25 @@ int main( int argc, char **argv ) {
     data.ampScal2 = .1;
 
     //Print info about audio and impulse response
-    printf("Left Impulse Response:\n\
+    printf("\n\nBuffer Size: %d\n\n", FRAMES_PER_BUFFER);
+
+    printf("Left Impulse Response: %s\n\
 -----------------------\n\
 Number of input channels: \t%d\n\
 Number of input frames:\t\t%lld\n\n", 
-    leftIRdata.channels, leftIRdata.frames);
+    leftIRfilename, leftIRdata.channels, leftIRdata.frames);
 
-    printf("Right Impulse Response:\n\
+    printf("Right Impulse Response: %s\n\
 ------------------------\n\
 Number of input channels: \t%d\n\
 Number of input frames:\t\t%lld\n\n", 
-    rightIRdata.channels, rightIRdata.frames);
+    rightIRfilename, rightIRdata.channels, rightIRdata.frames);
     
-    printf("Audio Signal\n------------------------\nNumber of output channels: \t%d\nNumber of output frames:\t%lld\n\n", audioData.channels, audioData.frames);
+    printf("Audio Signal: %s\
+\n------------------------\
+\nNumber of output channels: \t%d\n\
+Number of output frames:\t%lld\n\n", 
+audioFilename, audioData.channels, audioData.frames);
 
     /* Setup sfinfo for output audio file */
     memset(&data.sf_outinfo, 0, sizeof(SF_INFO));
