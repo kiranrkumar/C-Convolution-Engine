@@ -33,6 +33,7 @@
 #include <string.h> /* for memset */
 #include <stdbool.h>
 #include <fftw3.h>
+#include "convolve.h"
 //#include <ncurses.h>
 
 
@@ -105,10 +106,6 @@ static int paCallback( const void *inputBuffer,
         sf_seek(data->infile, 0, SEEK_SET);
         readcount = sf_readf_double(data->infile, data->file_buff + readcount, framesPerBuffer - readcount);
     }
-
-    /**********************************
-     ********** FFTW3 CALLS ***********
-     **********************************/
     
     /**** Declare variables ****/
     
@@ -116,28 +113,8 @@ static int paCallback( const void *inputBuffer,
 
     //hold time domain audio and IR signals
     double *in;
-    double *in2;
     double *inIR;
-    double *in2IR;
     double *convolvedSig;
-
-    //hold FFT values for audio and IR
-    fftw_complex *outfftw;
-    fftw_complex *outfftwIR;
-    
-    //hold the frequency-multiplied signal
-    fftw_complex *outFftMulti;
-
-    //hold plans to do real-to-complex FFT
-    fftw_plan plan_forward;
-    fftw_plan plan_forwardIR;
-        
-	//hold plans to do IFFT (complex-to-real)
-    fftw_plan plan_backward;
-    fftw_plan plan_backwardIR;
-    fftw_plan plan_backwardConv;
-    
-    int nc; //number of complex values to store in outfftw array
 
     /**** Crete the input arrays ****/
     
@@ -151,66 +128,14 @@ static int paCallback( const void *inputBuffer,
         in[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
         inIR[i] = (i < data->ir_len) ? data->irBuffer[i] : 0;
     }
-    
-
-    /**** Create the output arrays ****/
-    nc = convSigLen/2 + 1;
-    outfftw = fftw_malloc(sizeof(fftw_complex) * convSigLen);
-    outfftwIR = fftw_malloc(sizeof(fftw_complex) * convSigLen);
-    
-	/**** Create the FFTW forward plans ****/
-    
-    plan_forward = fftw_plan_dft_r2c_1d(convSigLen, in, outfftw, FFTW_ESTIMATE);
-    plan_forwardIR = fftw_plan_dft_r2c_1d(convSigLen, inIR, outfftwIR, FFTW_ESTIMATE);
-
-
-    /*********************/
-    /* EXECUTE THE FFTs!! */
-    /*********************/
-    fftw_execute(plan_forward);
-    fftw_execute(plan_forwardIR);
-
-    /********************************/
-    /*** COMPLEX MULTIPLICATION!! ***/
-    /********************************/
-    
-    outFftMulti = fftw_malloc(sizeof(fftw_complex) * nc);
-	for ( i = 0; i < nc; i++ )
-	{
-	
-		//real component
-		outFftMulti[i][0] = outfftw[i][0] * outfftwIR[i][0] - outfftw[i][1] * outfftwIR[i][1];
-		//imaginary component
-		outFftMulti[i][1] = outfftw[i][0] * outfftwIR[i][1] + outfftw[i][1] * outfftwIR[i][0];
-	}
-
-
-    //DEBUG PRINT
-    //printf("\nBefore allocating in2");
-    
-    /**** Prepare the input arrays to hold the [to be] IFFT'd data ****/
-    in2 = fftw_malloc(sizeof(double) * convSigLen);
-    in2IR = fftw_malloc(sizeof(double) * convSigLen);
-    convolvedSig = fftw_malloc(sizeof(double) * convSigLen);
-
-	/**** Prepare the backward plans and execute the IFFT ****/
-    plan_backward = fftw_plan_dft_c2r_1d(convSigLen, outfftw, in2, FFTW_ESTIMATE);
-    plan_backwardIR = fftw_plan_dft_c2r_1d(convSigLen, outfftwIR, in2IR, FFTW_ESTIMATE);
-    plan_backwardConv = fftw_plan_dft_c2r_1d(convSigLen, outFftMulti, convolvedSig, FFTW_ESTIMATE);
-    fftw_execute(plan_backward);
-    fftw_execute(plan_backwardIR);
-    fftw_execute(plan_backwardConv);
-
-
-	/******************************************
-     ******** END INITIAL FFTW3 CALLS *********
-     ******************************************/
 
     //Check to see if we're at the end of the impulse response (IR)
     if ( (( irIx + framesPerBuffer ) > data->ir_len) ) {
         endOfIR = true;
-        //printf("End of the impulse response!\n");
     }
+    
+    // Convolve signals via convolution function
+    convolve(in, framesPerBuffer, inIR, data->ir_len, &convolvedSig);
     
     /********************************************
      **** COPY DATA INTO APPROPRIATE BUFFERS ****
@@ -221,8 +146,6 @@ static int paCallback( const void *inputBuffer,
        RESULTBUFFER[(2 * resultBufIx) % BUFFERSIZE_MAX] += convolvedSig[i];
        RESULTBUFFER[(2 * resultBufIx + 1) % BUFFERSIZE_MAX] += convolvedSig[i];
        
-
-       //out[2*i + 1] = convolvedSig[i];
        
        if (i < framesPerBuffer)
        {
@@ -244,31 +167,13 @@ static int paCallback( const void *inputBuffer,
     //sf_writef_double(data->outfile, out, framesPerBuffer);
     
 	resultBufIx -= (convSigLen - framesPerBuffer);
-    //DEBUG print
-    
-	/**********************************/
-    /***** MORE FFTW CALLS!!!!!!! *****/
-	/**********************************/
-	
+		
 	/**** Free up allocated memory *******/
-	
-	//Destroy all FFT plans (forward and backward)
-    fftw_destroy_plan( plan_forward );
-    fftw_destroy_plan( plan_forwardIR );
-    fftw_destroy_plan( plan_backward );
-    fftw_destroy_plan( plan_backwardIR );
-    fftw_destroy_plan( plan_backwardConv );
 
 	//Free memory for all buffers
     fftw_free(in);
-    fftw_free(in2);
     fftw_free(inIR);
-    fftw_free(in2IR);
     fftw_free(convolvedSig);
-    fftw_free(outfftw);
-    fftw_free(outfftwIR);
-    fftw_free(outFftMulti);
-
 
     //update indices
     if (endOfIR) {
@@ -319,8 +224,8 @@ int main( int argc, char **argv ) {
         return EXIT_FAILURE;
     }
 
-    impulseFilename = argv[1];
     audioFilename = argv[2];
+    impulseFilename = argv[1];
 
     //Open impulse response file
     if ((irFile = sf_open(impulseFilename, SFM_READ, &irData)) == NULL ) 

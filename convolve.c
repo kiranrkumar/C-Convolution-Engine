@@ -16,15 +16,25 @@
 #include <fftw3.h>
 
 
-void convolve (double *sigOne, int lenOne, double *sigTwo, int lenTwo, double *convolvedSig)
+/**********************************************************************************
+************************************ convolve *************************************
+***********************************************************************************
+** Parameters:
+**		sigOne:			the first of the two audio signals to convolve (e.g. the dry audio)/
+**		lenOne:			length of the first audio signal
+**		sigTwo:			the second of the two signals to convolve (e.g. the impulse response)
+**		lenTwo:			length of the second audio signal
+**		convolvedSig:	UNALLOCATED buffer to hold the convolved signal
+***********************************************************************************/
+void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **convolvedSig)
 {
 	int i;
 	int convSigLen = lenOne + lenTwo - 1;
 	int nc = convSigLen/2 + 1;
 	
 	//Hold the initial signals
-	double *sigOnePadded = fftw_malloc(sizeof(double) * lenOne);
-	double *sigTwoPadded = fftw_malloc(sizeof(double) * lenTwo);
+	double *sigOnePadded = fftw_malloc(sizeof(double) * convSigLen);
+	double *sigTwoPadded = fftw_malloc(sizeof(double) * convSigLen);
 
 	//Forward FFT plans
 	fftw_plan forward_sigOne;
@@ -61,9 +71,9 @@ void convolve (double *sigOne, int lenOne, double *sigTwo, int lenTwo, double *c
 		fftMulti[i][1] = outfftwOne[i][0] * outfftwTwo[i][1] + outfftwOne[i][1] * outfftwTwo[i][0];
 	}
 	
-	convolvedSig = fftw_malloc(sizeof(double) * convSigLen);
+	*convolvedSig = fftw_malloc(sizeof(double) * convSigLen);
 
-	backward_convolution = fftw_plan_dft_c2r_1d(convSigLen, fftMulti, convolvedSig, FFTW_ESTIMATE);
+	backward_convolution = fftw_plan_dft_c2r_1d(convSigLen, fftMulti, *convolvedSig, FFTW_ESTIMATE);
 	fftw_execute(backward_convolution);
 	
 	fftw_destroy_plan(forward_sigOne);

@@ -9,6 +9,8 @@ LIBS = -lportaudio -lsndfile -lfftw3 -lncurses
 
 EXE  = testConv
 
+HDRS = convolve.h
+
 SRCS = testConv.c convolve.c
 
 all: $(EXE)
