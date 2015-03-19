@@ -56,7 +56,7 @@ typedef struct {
     SF_INFO irRight_info;
 
 	// hold the input audio for playback
-    double file_buff[NUM_OUT_CHANNELS * FRAMES_PER_BUFFER];
+    double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
     
     double *window; //for windowing the signals prior to FFT
 
@@ -73,6 +73,9 @@ typedef struct {
     double ampScal2;
 } paData;
 
+void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
+void initBuffers();
+
 /*********************************************** 
  ***********************************************
  *********************************************** 
@@ -88,7 +91,7 @@ static int paCallback( const void *inputBuffer,
     
 	//printf("\nDebug: Begin callback");
     int readcount, i;
-    static int resultBufIx = 0;
+    static int resultIxLeft = 0, resultIxRight = 0;
 
     static int irIx = 0; //index for where we are in the impulse response
     static bool endOfIR = false;
@@ -97,7 +100,7 @@ static int paCallback( const void *inputBuffer,
     float *out = (float*) outputBuffer;
     paData *data = (paData*) userData;
 
-    // IMPORTANT - Read frames of float type into our buffer for playback
+    // IMPORTANT - Read frames of double type into our buffer for playback
     readcount = sf_readf_double(data->infile, data->file_buff, framesPerBuffer);
 
     // IMPORTANT - If we're at the end of the file, let's start again
@@ -109,24 +112,27 @@ static int paCallback( const void *inputBuffer,
     
     /**** Declare variables ****/
     
-	int convSigLen = framesPerBuffer + data->ir_len - 1;
+	int convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
+	int convSigLenRight = framesPerBuffer + data->irRight_len - 1;
+	int maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
 
     //hold time domain audio and IR signals
-    double *in;
-    double *inIR;
-    double *convolvedSig;
+    double *inLeft = fftw_malloc(sizeof(double) * maxLen );
+    double *inRight = fftw_malloc(sizeof(double) * maxLen );
+    double *inIRLeft = fftw_malloc(sizeof(double) * maxLen );
+    double *inIRRight = fftw_malloc(sizeof(double) * maxLen );
+    double *convolvedSigLeft;
+    double *convolvedSigRight;
 
-    /**** Crete the input arrays ****/
-    
-    //Allocate space
-    in = fftw_malloc(sizeof(double) * convSigLen );
-    inIR = fftw_malloc(sizeof(double) * convSigLen );
 
-	//Store samples into in and inIR
-    for (i = 0; i < convSigLen; i++)
+	//Store samples into in and inIR buffers
+    for (i = 0; i < maxLen; i++)
     {
-        in[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
-        inIR[i] = (i < data->ir_len) ? data->irBuffer[i] : 0;
+        inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
+        inRight[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
+
+        inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
+        inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
     }
 
     //Check to see if we're at the end of the impulse response (IR)
@@ -135,30 +141,34 @@ static int paCallback( const void *inputBuffer,
     }
     
     // Convolve signals via convolution function
-    convolve(in, framesPerBuffer, inIR, data->ir_len, &convolvedSig);
+    convolve(inLeft, framesPerBuffer, inIRLeft, data->irLeft_len, &convolvedSigLeft);
+    convolve(inRight, framesPerBuffer, inIRRight, data->irRight_len, &convolvedSigRight);
     
     /********************************************
      **** COPY DATA INTO APPROPRIATE BUFFERS ****
     *********************************************/
-    for (i = 0; i < convSigLen; i++)
+    for (i = 0; i < maxLen; i++)
     {  
-       convolvedSig[i] = convolvedSig[i] / (double) convSigLen;       
-       RESULTBUFFER[(2 * resultBufIx) % BUFFERSIZE_MAX] += convolvedSig[i];
-       RESULTBUFFER[(2 * resultBufIx + 1) % BUFFERSIZE_MAX] += convolvedSig[i];
-       
+       //Normalized convolved signals
+       convolvedSigLeft[i] = (i < convSigLenLeft) ? (convolvedSigLeft[i] /(double)convSigLenLeft) : 0;
+       convolvedSigRight[i] = (i < convSigLenRight) ? (convolvedSigRight[i] /(double)convSigLenRight) : 0;
+
+       RESULTBUFFER_LEFT[(resultIxLeft) % BUFFERSIZE_MAX] += convolvedSigLeft[i];
+       RESULTBUFFER_RIGHT[(resultIxRight) % BUFFERSIZE_MAX] += convolvedSigRight[i];
        
        if (i < framesPerBuffer)
        {
 		   //store result buffer values into output
-	       out[2*i] = (float) RESULTBUFFER[(2 * resultBufIx) % BUFFERSIZE_MAX];
-	       out[2*i + 1] = (float) RESULTBUFFER[(2 * resultBufIx + 1) % BUFFERSIZE_MAX];
+	       out[2*i] = (float) RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX];
+	       out[2*i + 1] = (float) RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX];
 	       
 	       //zero out the result buffer value so that the index can be used again the next loop around
-	       RESULTBUFFER[(2 * resultBufIx) % BUFFERSIZE_MAX] = 0;
-	       RESULTBUFFER[(2 * resultBufIx + 1) % BUFFERSIZE_MAX] = 0;
+	       RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX] = 0;
+	       RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX] = 0;
        }
        
-       resultBufIx++;
+       resultIxLeft++;
+       resultIxRight++;
     }
 
 
@@ -166,14 +176,18 @@ static int paCallback( const void *inputBuffer,
     //sf_writef_double(data->outfile, &RESULTBUFFER[(2 * (resultBufIx - convSigLen) ) % BUFFERSIZE_MAX], framesPerBuffer);
     //sf_writef_double(data->outfile, out, framesPerBuffer);
     
-	resultBufIx -= (convSigLen - framesPerBuffer);
+	resultIxLeft -= (convSigLenLeft - framesPerBuffer);
+	resultIxRight -= (convSigLenRight - framesPerBuffer);
 		
 	/**** Free up allocated memory *******/
 
 	//Free memory for all buffers
-    fftw_free(in);
-    fftw_free(inIR);
-    fftw_free(convolvedSig);
+    fftw_free(inLeft);
+    fftw_free(inRight);
+    fftw_free(inIRLeft);
+    fftw_free(inIRRight);
+   	fftw_free(convolvedSigLeft);
+    fftw_free(convolvedSigRight);
 
     //update indices
     if (endOfIR) {
@@ -187,9 +201,9 @@ static int paCallback( const void *inputBuffer,
     //DEBUG PRINTS
     //printf("\nEnd of Callback!");
     
-    data->numConv++;
     //printf("Buffer size: %lu  IR length: %d   Convolutions Performed: %d",framesPerBuffer, data->ir_len, data->numConv);
     //printf("  Frames Processed: %lu  Seconds Processed: %4.2f\n", framesPerBuffer * data->ir_len * data->numConv, ((float)(framesPerBuffer * data->numConv)/SAMPLE_RATE));
+    //printf("Convolution sets performed: %d\n", data->numConv++);
 
     return paContinue;
 }
@@ -210,23 +224,28 @@ int main( int argc, char **argv ) {
     PaError err;
     paData data;
 
-    SNDFILE *irFile, *audioFile;
-    SF_INFO irData, audioData;
-    double *irBuffer;
-    double irLen;
+    SNDFILE *audioFile; //, *irFile,;
+    SF_INFO audioData, leftIRdata, rightIRdata; //,irData;
+    //double *irBuffer;
+    //double irLen;
 
-    char *impulseFilename, *audioFilename;
+    char *leftIRfilename, *rightIRfilename, *audioFilename; // *impulseFilename
 
 
     /* Check arguments */
-    if ( argc != 3 ) {
-        printf("Usage: %s impulse_response_filename.wav audio_filename.wav\n", argv[0]);
+    if ( argc != 4 ) {
+        printf("Usage: %s audio_filename.wav left_HRTF_filename.wav right_HRTF_filename.wav\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    audioFilename = argv[2];
-    impulseFilename = argv[1];
+    audioFilename = argv[1];
+    leftIRfilename = argv[2];
+    rightIRfilename = argv[3];
+    
+    initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
 
+    
+    /*
     //Open impulse response file
     if ((irFile = sf_open(impulseFilename, SFM_READ, &irData)) == NULL ) 
     {
@@ -234,7 +253,8 @@ int main( int argc, char **argv ) {
         puts(sf_strerror(NULL));
         return EXIT_FAILURE;
     }
-
+	*/
+	
     //Open audio file to play
     if ((audioFile = sf_open(audioFilename, SFM_READ, &audioData)) == NULL ) 
     {
@@ -242,7 +262,7 @@ int main( int argc, char **argv ) {
         puts(sf_strerror(NULL));
         return EXIT_FAILURE;
     }
-
+	
 
     /*************************************
     ** Initiate Port Audio data values ***
@@ -253,18 +273,29 @@ int main( int argc, char **argv ) {
     data.infile = audioFile;
 
 	// Impulse response
-    irLen = irData.channels * irData.frames;
-    irBuffer = (double *)malloc(irLen * sizeof(double));
-    sf_readf_double(irFile, irBuffer, irData.frames);
-    data.irBuffer = irBuffer;
-    data.ir_len = irLen;
+    //irLen = irData.channels * irData.frames;
+    //irBuffer = (double *)malloc(irLen * sizeof(double));
+    //sf_readf_double(irFile, irBuffer, irData.frames);
+    //data.irBuffer = irBuffer;
+    //data.ir_len = irLen;
 
 	// Scaling factors
     data.ampScal = .5;
     data.ampScal2 = .1;
 
     //Print info about audio and impulse response
-    printf("Impulse Response\n------------------------\nNumber of input channels: \t%d\nNumber of input frames:\t\t%lld\n\n", irData.channels, irData.frames);
+    printf("Left Impulse Response:\n\
+-----------------------\n\
+Number of input channels: \t%d\n\
+Number of input frames:\t\t%lld\n\n", 
+    leftIRdata.channels, leftIRdata.frames);
+
+    printf("Right Impulse Response:\n\
+------------------------\n\
+Number of input channels: \t%d\n\
+Number of input frames:\t\t%lld\n\n", 
+    rightIRdata.channels, rightIRdata.frames);
+    
     printf("Audio Signal\n------------------------\nNumber of output channels: \t%d\nNumber of output frames:\t%lld\n\n", audioData.channels, audioData.frames);
 
     /* Setup sfinfo for output audio file */
@@ -285,14 +316,14 @@ int main( int argc, char **argv ) {
 
 
 	/* Create Hamming Window */
-	int winSize = data.ir_len + FRAMES_PER_BUFFER - 1;
+	/*int winSize = data.ir_len + FRAMES_PER_BUFFER - 1;
 	double *sigWindow = (double *)malloc(winSize * sizeof(double));
 	for (int i = 0; i < winSize; i++)
 	{
 		sigWindow[i] = 0.54 - 0.46*cos(2*M_PI);
 	}
 	
-	data.window = sigWindow;
+	data.window = sigWindow;*/
 
     /* Initialize PortAudio */
     Pa_Initialize();
@@ -351,6 +382,7 @@ int main( int argc, char **argv ) {
   /*  mvprintw(6, 6, "Pitch Shift Ratio: %f\n\n[j/k] decreases/increases pitch shift ratio\n" \
             "[q] to quit\n", 2);*/
             
+    printf("\nEnter 'q' to quit: ");
     while (ch != 'q') {
         ch = getchar();
     	//mvprintw(0, 0, "Number of sets of FFT and IFFTs: %d\n", data.numConv);
@@ -395,7 +427,7 @@ int main( int argc, char **argv ) {
 ************************************************
 ************************************************/
 
-void initIRPair (char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data)
+void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data)
 {
 
     SNDFILE *leftIrFile, *rightIrFile;
@@ -438,5 +470,15 @@ void initIRPair (char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_IN
     data->irRight_info = *rightIR;
     data->irLeftBuffer = irLeftBuffer;
     data->irRightBuffer = irRightBuffer;
-	
+	data->irLeft_len = irLeftLen;
+	data->irRight_len = irRightLen;
+}
+
+void initBuffers()
+{
+	for (int i = 0; i < BUFFERSIZE_MAX; i++)
+	{
+		RESULTBUFFER_LEFT[i] = 0;
+		RESULTBUFFER_RIGHT[i] = 0;
+	}
 }
