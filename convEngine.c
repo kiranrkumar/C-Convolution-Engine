@@ -22,6 +22,12 @@
 #define NUM_IN_CHANNELS     1
 #define NUM_OUT_CHANNELS    2
 #define BUFFERSIZE_MAX      (SAMPLE_RATE * 10 * NUM_OUT_CHANNELS) //assume  (IR length + framesPerBuffer) is not longer than 10 seconds
+#define AZI_MIN				0
+#define	AZI_MAX				360
+#define AZI_INC				5
+#define ELE_MIN				-90
+#define ELE_MAX				90
+#define ELE_INC				5
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +76,7 @@ typedef struct {
     double ampScal2;
 } paData;
 
-void initAudioData(char *filename, paData *data);
+void initAudioData(char *filename, paData *data, int az, int elev);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
 void initBuffers()
@@ -226,7 +232,7 @@ int main( int argc, char **argv ) {
     rightIRfilename = argv[3];
     
     //Open audio file to play
-	initAudioData(audioFilename, &data);
+	initAudioData(audioFilename, &data, 0, 0);
 
 	// Initialize pair of impulse responses
     initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
@@ -236,9 +242,6 @@ int main( int argc, char **argv ) {
     ** Initiate Port Audio data values ***
     **************************************/
     
-	// Main audio
-    //data.sf_inInfo = audioData;
-    //data.infile = audioFile;
 
 	// Scaling factors
     data.ampScal = .5;
@@ -329,12 +332,36 @@ int main( int argc, char **argv ) {
 	mvprintw(2, 0, "%s%s", "Audio Signal: ", audioFilename);
 	mvprintw(3, 0, "%s%d", "Number of output channels: ", data.sf_inInfo.channels);
 	mvprintw(4, 0, "%s%d", "Number of frames: ", data.sf_inInfo.frames);
+	
+    mvprintw(row/2 - 5, 0, "%s", "Type 'q' to quit: ");
 
-    printf("\nEnter 'q' to quit: ");
+	mvprintw(row/2, 0, "%s%5d", "Azimuth: ", data.azimuth);
+    mvprintw(row/2 + 1, 0, "%s%5d", "Elevation: ", data.elevation);
+    mvprintw(row/2 + 2, 0, "%s%c", "Typed character: ", ch);
+
     refresh();
     while (ch != 'q') {
         ch = getchar();
-        mvprintw(row/2, 0, "%c", ch);
+        switch (ch)
+        {
+        	case 65:
+        		if ( (data.elevation + ELE_INC) <= ELE_MAX)
+	        		data.elevation = (data.elevation + 5);
+        		break;
+        	case 66:
+	        	if ( (data.elevation - ELE_INC) >= ELE_MIN)
+		        	data.elevation = (data.elevation - 5);
+        		break;
+        	case 67:
+	        	data.azimuth = (data.azimuth + 360 + 5) % 360;
+        		break;
+        	case 68:
+	        	data.azimuth = (data.azimuth + 360 - 5) % 360;
+        		break;	
+        }
+        mvprintw(row/2, 0, "%s%5d", "Azimuth: ", data.azimuth);
+        mvprintw(row/2 + 1, 0, "%s%5d", "Elevation: ", data.elevation);
+        mvprintw(row/2 + 2, 0, "%s%c", "Typed character: ", ch);
         refresh();
     }
     
@@ -375,7 +402,7 @@ int main( int argc, char **argv ) {
  ***********************************************
  ***********************************************/
 
-void initAudioData(char *filename, paData *data)
+void initAudioData(char *filename, paData *data, int az, int elev)
 {
     SNDFILE *audioFile;
     SF_INFO audioData;
@@ -389,6 +416,9 @@ void initAudioData(char *filename, paData *data)
     
     data->sf_inInfo = audioData;
     data->infile = audioFile;
+    
+    data->azimuth = az;
+    data->elevation = elev;
 }
 
 /*********************************************** 
