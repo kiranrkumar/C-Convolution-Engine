@@ -4,8 +4,7 @@
  *       Filename:  convEngine.c
  *
  *    Description:  Testing convolution of real-time input
- *                  Using functionality from delay.c and shifter.c from MPATE-GE 2618
- *                  - C Programming for Music Technology
+ *                  
  *
  *        Version:  1.0
  *        Created:  02/18/2015 10:06:46
@@ -36,8 +35,6 @@
 #include "convolve.h"
 #include <ncurses.h>
 
-
-double RESULTBUFFER[BUFFERSIZE_MAX];
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
 double RESULTBUFFER_RIGHT[BUFFERSIZE_MAX];
 
@@ -73,6 +70,7 @@ typedef struct {
     double ampScal2;
 } paData;
 
+void initAudioData(char *filename, paData *data);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
 void initBuffers()
@@ -199,11 +197,9 @@ static int paCallback( const void *inputBuffer,
 }
 
 /*********************************************** 
- ***********************************************
  *********************************************** 
  ***************  MAIN FUNCTION ****************
  ***********************************************
-************************************************
 ************************************************/
 
 int main( int argc, char **argv ) {
@@ -214,8 +210,7 @@ int main( int argc, char **argv ) {
     PaError err;
     paData data;
 
-    SNDFILE *audioFile;
-    SF_INFO audioData, leftIRdata, rightIRdata;
+    SF_INFO leftIRdata, rightIRdata;
 
     char *leftIRfilename, *rightIRfilename, *audioFilename; // *impulseFilename
 
@@ -230,17 +225,11 @@ int main( int argc, char **argv ) {
     leftIRfilename = argv[2];
     rightIRfilename = argv[3];
     
+    //Open audio file to play
+	initAudioData(audioFilename, &data);
+
 	// Initialize pair of impulse responses
     initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
-
-	
-    //Open audio file to play
-    if ((audioFile = sf_open(audioFilename, SFM_READ, &audioData)) == NULL ) 
-    {
-        printf("Error, could not open audio file%s.\n", audioFilename);
-        puts(sf_strerror(NULL));
-        return EXIT_FAILURE;
-    }
 	
 
     /*************************************
@@ -248,8 +237,8 @@ int main( int argc, char **argv ) {
     **************************************/
     
 	// Main audio
-    data.sf_inInfo = audioData;
-    data.infile = audioFile;
+    //data.sf_inInfo = audioData;
+    //data.infile = audioFile;
 
 	// Scaling factors
     data.ampScal = .5;
@@ -338,8 +327,8 @@ int main( int argc, char **argv ) {
     mvprintw(9, col/2, "%s%d", "Number of input frames: ", rightIRdata.frames);
 
 	mvprintw(2, 0, "%s%s", "Audio Signal: ", audioFilename);
-	mvprintw(3, 0, "%s%d", "Number of output channels: ", audioData.channels);
-	mvprintw(4, 0, "%s%d", "Number of frames: ", audioData.frames);
+	mvprintw(3, 0, "%s%d", "Number of output channels: ", data.sf_inInfo.channels);
+	mvprintw(4, 0, "%s%d", "Number of frames: ", data.sf_inInfo.frames);
 
     printf("\nEnter 'q' to quit: ");
     refresh();
@@ -381,12 +370,32 @@ int main( int argc, char **argv ) {
 }
 
 /*********************************************** 
+ *********************************************** 
+ ****** INITIALIZE AUDIO SOURCE DATA ***********
  ***********************************************
+ ***********************************************/
+
+void initAudioData(char *filename, paData *data)
+{
+    SNDFILE *audioFile;
+    SF_INFO audioData;
+
+    if ((audioFile = sf_open(filename, SFM_READ, &audioData)) == NULL ) 
+    {
+        printf("Error, could not open audio file%s.\n", filename);
+        puts(sf_strerror(NULL));
+        return;
+    }
+    
+    data->sf_inInfo = audioData;
+    data->infile = audioFile;
+}
+
+/*********************************************** 
  *********************************************** 
  ****** INITIALIZE IMPULSE RESPONSE DATA *******
  ***********************************************
-************************************************
-************************************************/
+ ***********************************************/
 
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data)
 {
