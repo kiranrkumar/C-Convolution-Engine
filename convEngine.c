@@ -56,13 +56,9 @@ typedef struct {
 
 	// hold the input audio for playback
     double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
-    
-    double *window; //for windowing the signals prior to FFT
 
-    //int ir_len;
     int irLeft_len;
     int irRight_len;
-    //double *irBuffer;
     double *irLeftBuffer;
     double *irRightBuffer;
 
@@ -96,7 +92,6 @@ static int paCallback( const void *inputBuffer,
         PaStreamCallbackFlags statusFlags, void *userData ) 
 {
     
-	//printf("\nDebug: Begin callback");
     int readcount, i;
     static int resultIxLeft = 0, resultIxRight = 0;
 
@@ -172,11 +167,6 @@ static int paCallback( const void *inputBuffer,
        resultIxLeft++;
        resultIxRight++;
     }
-
-
-    /**** write the output to a file ****/
-    //sf_writef_double(data->outfile, &RESULTBUFFER[(2 * (resultBufIx - convSigLen) ) % BUFFERSIZE_MAX], framesPerBuffer);
-    //sf_writef_double(data->outfile, out, framesPerBuffer);
     
 	resultIxLeft -= (convSigLenLeft - framesPerBuffer);
 	resultIxRight -= (convSigLenRight - framesPerBuffer);
@@ -200,13 +190,6 @@ static int paCallback( const void *inputBuffer,
         irIx += framesPerBuffer;
     }
 
-    //DEBUG PRINTS
-    //printf("\nEnd of Callback!");
-    
-    //printf("Buffer size: %lu  IR length: %d   Convolutions Performed: %d",framesPerBuffer, data->ir_len, data->numConv);
-    //printf("  Frames Processed: %lu  Seconds Processed: %4.2f\n", framesPerBuffer * data->ir_len * data->numConv, ((float)(framesPerBuffer * data->numConv)/SAMPLE_RATE));
-    //printf("Convolution sets performed: %d\n", data->numConv++);
-
     return paContinue;
 }
 
@@ -226,10 +209,8 @@ int main( int argc, char **argv ) {
     PaError err;
     paData data;
 
-    SNDFILE *audioFile; //, *irFile,;
-    SF_INFO audioData, leftIRdata, rightIRdata; //,irData;
-    //double *irBuffer;
-    //double irLen;
+    SNDFILE *audioFile;
+    SF_INFO audioData, leftIRdata, rightIRdata;
 
     char *leftIRfilename, *rightIRfilename, *audioFilename; // *impulseFilename
 
@@ -244,18 +225,9 @@ int main( int argc, char **argv ) {
     leftIRfilename = argv[2];
     rightIRfilename = argv[3];
     
+	// Initialize pair of impulse responses
     initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
 
-    
-    /*
-    //Open impulse response file
-    if ((irFile = sf_open(impulseFilename, SFM_READ, &irData)) == NULL ) 
-    {
-        printf("Error, could not open impulse file %s.\n", impulseFilename);
-        puts(sf_strerror(NULL));
-        return EXIT_FAILURE;
-    }
-	*/
 	
     //Open audio file to play
     if ((audioFile = sf_open(audioFilename, SFM_READ, &audioData)) == NULL ) 
@@ -273,13 +245,6 @@ int main( int argc, char **argv ) {
 	// Main audio
     data.sf_inInfo = audioData;
     data.infile = audioFile;
-
-	// Impulse response
-    //irLen = irData.channels * irData.frames;
-    //irBuffer = (double *)malloc(irLen * sizeof(double));
-    //sf_readf_double(irFile, irBuffer, irData.frames);
-    //data.irBuffer = irBuffer;
-    //data.ir_len = irLen;
 
 	// Scaling factors
     data.ampScal = .5;
@@ -323,15 +288,6 @@ audioFilename, audioData.channels, audioData.frames);
     }
 
 
-	/* Create Hamming Window */
-	/*int winSize = data.ir_len + FRAMES_PER_BUFFER - 1;
-	double *sigWindow = (double *)malloc(winSize * sizeof(double));
-	for (int i = 0; i < winSize; i++)
-	{
-		sigWindow[i] = 0.54 - 0.46*cos(2*M_PI);
-	}
-	
-	data.window = sigWindow;*/
 
     /* Initialize PortAudio */
     Pa_Initialize();
@@ -386,14 +342,10 @@ audioFilename, audioData.channels, audioData.frames);
 
     char ch;
     ch = '\0'; /* Init ch to null character */
-
-  /*  mvprintw(6, 6, "Pitch Shift Ratio: %f\n\n[j/k] decreases/increases pitch shift ratio\n" \
-            "[q] to quit\n", 2);*/
             
     printf("\nEnter 'q' to quit: ");
     while (ch != 'q') {
         ch = getchar();
-    	//mvprintw(0, 0, "Number of sets of FFT and IFFTs: %d\n", data.numConv);
     }
     
     /* End curses mode  */
