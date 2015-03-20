@@ -34,7 +34,7 @@
 #include <stdbool.h>
 #include <fftw3.h>
 #include "convolve.h"
-//#include <ncurses.h>
+#include <ncurses.h>
 
 
 double RESULTBUFFER[BUFFERSIZE_MAX];
@@ -50,17 +50,22 @@ typedef struct {
     SNDFILE *outfile;
     SF_INFO sf_outinfo;
     
-    //impulse responses
+    //impulse response data
     SF_INFO irLeft_info;
     SF_INFO irRight_info;
 
-	// hold the input audio for playback
-    double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
-
     int irLeft_len;
     int irRight_len;
+    
     double *irLeftBuffer;
     double *irRightBuffer;
+
+	// positions in 3-D space
+	int azimuth; //should be between 0 and 360
+	int elevation; //should be between -90 and 90 (theoretically)
+
+	// hold the input audio for playback
+    double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
 
 	int numConv; //number of convolutions performed
 
@@ -250,27 +255,6 @@ int main( int argc, char **argv ) {
     data.ampScal = .5;
     data.ampScal2 = .1;
 
-    //Print info about audio and impulse response
-    printf("\n\nBuffer Size: %d\n\n", FRAMES_PER_BUFFER);
-
-    printf("Left Impulse Response: %s\n\
------------------------\n\
-Number of input channels: \t%d\n\
-Number of input frames:\t\t%lld\n\n", 
-    leftIRfilename, leftIRdata.channels, leftIRdata.frames);
-
-    printf("Right Impulse Response: %s\n\
-------------------------\n\
-Number of input channels: \t%d\n\
-Number of input frames:\t\t%lld\n\n", 
-    rightIRfilename, rightIRdata.channels, rightIRdata.frames);
-    
-    printf("Audio Signal: %s\
-\n------------------------\
-\nNumber of output channels: \t%d\n\
-Number of output frames:\t%lld\n\n", 
-audioFilename, audioData.channels, audioData.frames);
-
     /* Setup sfinfo for output audio file */
     memset(&data.sf_outinfo, 0, sizeof(SF_INFO));
     data.sf_outinfo.samplerate = SAMPLE_RATE;
@@ -331,25 +315,42 @@ audioFilename, audioData.channels, audioData.frames);
      *********** USER INPUT*************
      ***********************************/
     /* Allow character input to quit program */
+    int row, col;
     
     /* Initialize interactive character input */
-	/*    initscr(); // Start curses mode
-    cbreak();  // Line buffering disabled
-    noecho(); // Comment this out if you want to show characters when they are typed
-    nonl();
-    intrflush(stdscr, FALSE);
-    keypad(stdscr, TRUE);*/
+	initscr(); // Start curses mode
+    keypad(stdscr, TRUE);
 
     char ch;
     ch = '\0'; /* Init ch to null character */
-            
+
+	getmaxyx(stdscr,row,col);
+      
+    //Print info about audio and impulse response
+    mvprintw(0, col/3, "%s%d", "Buffer Size: ", FRAMES_PER_BUFFER);
+    
+    mvprintw(7, 0, "%s%s", "Left Impulse Response: ", leftIRfilename);
+    mvprintw(8, 0, "%s%d", "Number of input channels: ", leftIRdata.channels);
+    mvprintw(9, 0, "%s%d", "Number of input frames: ", leftIRdata.frames);
+    
+    mvprintw(7, col/2, "%s%s", "Right Impulse Response: ", rightIRfilename);
+    mvprintw(8, col/2, "%s%d", "Number of input channels: ", rightIRdata.channels);
+    mvprintw(9, col/2, "%s%d", "Number of input frames: ", rightIRdata.frames);
+
+	mvprintw(2, 0, "%s%s", "Audio Signal: ", audioFilename);
+	mvprintw(3, 0, "%s%d", "Number of output channels: ", audioData.channels);
+	mvprintw(4, 0, "%s%d", "Number of frames: ", audioData.frames);
+
     printf("\nEnter 'q' to quit: ");
+    refresh();
     while (ch != 'q') {
         ch = getchar();
+        mvprintw(row/2, 0, "%c", ch);
+        refresh();
     }
     
     /* End curses mode  */
-    //endwin();
+    endwin();
     
 
 	/***********************************
