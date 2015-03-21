@@ -23,7 +23,7 @@
 #define NUM_OUT_CHANNELS    2
 #define BUFFERSIZE_MAX      (SAMPLE_RATE * 10 * NUM_OUT_CHANNELS) //assume  (IR length + framesPerBuffer) is not longer than 10 seconds
 #define AZI_MIN				0
-#define	AZI_MAX				360
+#define	AZI_MAX				359
 #define AZI_INC				5
 #define ELE_MIN				-90
 #define ELE_MAX				90
@@ -44,7 +44,10 @@
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
 double RESULTBUFFER_RIGHT[BUFFERSIZE_MAX];
 
-typedef struct {
+
+
+typedef struct 
+{
     //input file - what will be looping on playback
     SNDFILE *infile;
     SF_INFO sf_inInfo;
@@ -89,12 +92,10 @@ void initBuffers()
 }
 
 /*********************************************** 
- ***********************************************
  *********************************************** 
  ********  PORTAUDIO CALLBACK FUNCTION *********
  ***********************************************		
-************************************************
-************************************************/
+ ***********************************************/
 static int paCallback( const void *inputBuffer,
         void *outputBuffer, unsigned long framesPerBuffer,
         const PaStreamCallbackTimeInfo* timeInfo,
@@ -315,33 +316,29 @@ int main( int argc, char **argv ) {
 
     char ch;
     ch = '\0'; /* Init ch to null character */
-
 	getmaxyx(stdscr,row,col);
       
     //Print info about audio and impulse response
     mvprintw(0, col/3, "%s%d", "Buffer Size: ", FRAMES_PER_BUFFER);
     
     mvprintw(7, 0, "%s%s", "Left Impulse Response: ", leftIRfilename);
-    mvprintw(8, 0, "%s%d", "Number of input channels: ", leftIRdata.channels);
-    mvprintw(9, 0, "%s%d", "Number of input frames: ", leftIRdata.frames);
+    mvprintw(8, 0, "%s%d", "Number of channels: ", leftIRdata.channels);
+    mvprintw(9, 0, "%s%d", "Number of frames: ", leftIRdata.frames);
     
     mvprintw(7, col/2, "%s%s", "Right Impulse Response: ", rightIRfilename);
-    mvprintw(8, col/2, "%s%d", "Number of input channels: ", rightIRdata.channels);
-    mvprintw(9, col/2, "%s%d", "Number of input frames: ", rightIRdata.frames);
+    mvprintw(8, col/2, "%s%d", "Number of channels: ", rightIRdata.channels);
+    mvprintw(9, col/2, "%s%d", "Number of frames: ", rightIRdata.frames);
 
 	mvprintw(2, 0, "%s%s", "Audio Signal: ", audioFilename);
-	mvprintw(3, 0, "%s%d", "Number of output channels: ", data.sf_inInfo.channels);
+	mvprintw(3, 0, "%s%d", "Number of channels: ", data.sf_inInfo.channels);
 	mvprintw(4, 0, "%s%d", "Number of frames: ", data.sf_inInfo.frames);
 	
     mvprintw(row/2 - 5, 0, "%s", "Type 'q' to quit: ");
+	
+	refresh();
 
-	mvprintw(row/2, 0, "%s%5d", "Azimuth: ", data.azimuth);
-    mvprintw(row/2 + 1, 0, "%s%5d", "Elevation: ", data.elevation);
-    mvprintw(row/2 + 2, 0, "%s%c", "Typed character: ", ch);
-
-    refresh();
     while (ch != 'q') {
-        ch = getchar();
+
         switch (ch)
         {
         	case 65:
@@ -362,7 +359,9 @@ int main( int argc, char **argv ) {
         mvprintw(row/2, 0, "%s%5d", "Azimuth: ", data.azimuth);
         mvprintw(row/2 + 1, 0, "%s%5d", "Elevation: ", data.elevation);
         mvprintw(row/2 + 2, 0, "%s%c", "Typed character: ", ch);
+        //mvprintw(row/2 + 3, 0, "%s%d", "Character length?...", strlen(&ch));
         refresh();
+        ch = getchar();
     }
     
     /* End curses mode  */
