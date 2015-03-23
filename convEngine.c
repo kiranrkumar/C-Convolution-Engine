@@ -21,6 +21,7 @@
 #define FRAMES_PER_BUFFER   64
 #define NUM_IN_CHANNELS     1
 #define NUM_OUT_CHANNELS    2
+#define MAX_SOURCES			16
 #define BUFFERSIZE_MAX      (SAMPLE_RATE * 10 * NUM_OUT_CHANNELS) //assume  (IR length + framesPerBuffer) is not longer than 10 seconds
 #define AZI_MIN				0
 #define	AZI_MAX				359
@@ -41,11 +42,11 @@
 #include "convolve.h"
 #include <ncurses.h>
 
+
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
 double RESULTBUFFER_RIGHT[BUFFERSIZE_MAX];
 
-
-
+// PortAudio data
 typedef struct 
 {
     //input file - what will be looping on playback
@@ -79,6 +80,21 @@ typedef struct
     double ampScal2;
 } paData;
 
+// Individual audio sources
+typedef struct
+{
+	// PortAudio information for the sound source
+	SNDFILE *srcFile;
+	SF_INFO *srcInfo;
+
+	// positions in 3-D space
+	int azimuth;
+	int elevation;
+} audioSource;
+
+audioSource SOURCE_BUFFER[MAX_SOURCES];
+
+audioSource *initAudioSource(char *filename);
 void initAudioData(char *filename, paData *data, int az, int elev);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
@@ -216,21 +232,29 @@ int main( int argc, char **argv ) {
     PaStreamParameters inputParameters;
     PaError err;
     paData data;
+    int numAudioSrc, i;
 
     SF_INFO leftIRdata, rightIRdata;
 
-    char *leftIRfilename, *rightIRfilename, *audioFilename; // *impulseFilename
+    char *leftIRfilename, *rightIRfilename, *audioFilename;
 
 
     /* Check arguments */
-    if ( argc != 4 ) {
-        printf("Usage: %s audio_filename.wav left_HRTF_filename.wav right_HRTF_filename.wav\n", argv[0]);
+    if ( argc < 4 ) {
+        printf("Usage: %s left_HRTF_filename.wav right_HRTF_filename.wav audio_filename.wav [additional_audio_filename(s).wav]\n", argv[0]);
         return EXIT_FAILURE;
     }
+    
+    numAudioSrc = argc - 3;
+    
+    for (i = 0; i < numAudioSrc; i++)
+    {
+    	
+    }
 
-    audioFilename = argv[1];
-    leftIRfilename = argv[2];
-    rightIRfilename = argv[3];
+    leftIRfilename = argv[1];
+    rightIRfilename = argv[2];
+    audioFilename = argv[3];
     
     //Open audio file to play
 	initAudioData(audioFilename, &data, 0, 0);
@@ -395,9 +419,20 @@ int main( int argc, char **argv ) {
     return 0;
 }
 
+
 /*********************************************** 
  *********************************************** 
- ****** INITIALIZE AUDIO SOURCE DATA ***********
+ ********** INITIALIZE AUDIO SOURCE ************
+ ***********************************************
+ ***********************************************/
+audioSource *initAudioSource(char *filename)
+{
+	audioSource *newSrc = (audioSource*)malloc(sizeof(audioSource));
+	return newSrc;
+}
+/*********************************************** 
+ *********************************************** 
+ ******** INITIALIZE PORTAUDIO DATA ************
  ***********************************************
  ***********************************************/
 
