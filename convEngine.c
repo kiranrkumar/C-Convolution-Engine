@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h> /* for sleep() */
 #include <portaudio.h>
 #include <sndfile.h>
@@ -41,8 +42,7 @@
 #include <fftw3.h>
 #include "convolve.h"
 #include <ncurses.h>
-
-
+	
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
 double RESULTBUFFER_RIGHT[BUFFERSIZE_MAX];
 
@@ -92,9 +92,9 @@ typedef struct
 	int elevation;
 } audioSource;
 
-audioSource SOURCE_BUFFER[MAX_SOURCES];
+audioSource *SOURCE_BUFFER[MAX_SOURCES];
 
-audioSource *initAudioSource(char *filename);
+audioSource *initAudioSource(char *filename, int azimuth);
 void initAudioData(char *filename, paData *data, int az, int elev);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
@@ -227,18 +227,19 @@ static int paCallback( const void *inputBuffer,
 
 int main( int argc, char **argv ) {
 
+	srand(time(NULL)); //seed the random number generator
+	
     PaStream *stream;
     PaStreamParameters outputParameters;
     PaStreamParameters inputParameters;
     PaError err;
     paData data;
-    int numAudioSrc, i;
+    int numAudioSrc, i, randTmp;
 
     SF_INFO leftIRdata, rightIRdata;
 
     char *leftIRfilename, *rightIRfilename, *audioFilename;
-
-
+	
     /* Check arguments */
     if ( argc < 4 ) {
         printf("Usage: %s left_HRTF_filename.wav right_HRTF_filename.wav audio_filename.wav [additional_audio_filename(s).wav]\n", argv[0]);
@@ -247,9 +248,14 @@ int main( int argc, char **argv ) {
     
     numAudioSrc = argc - 3;
     
+	// create an audio source for each source filename passed in
     for (i = 0; i < numAudioSrc; i++)
     {
-    	
+		// Generate a random azimuth value - multiple of 5 to correspond with the HRTF filenames
+		randTmp = rand() % 360;
+		randTmp -= (randTmp % 5) + 5;
+    	SOURCE_BUFFER[i] = initAudioSource(argv[i + 3], randTmp);
+    	printf("Random azimuth number is %d\n", randTmp);
     }
 
     leftIRfilename = argv[1];
@@ -425,7 +431,7 @@ int main( int argc, char **argv ) {
  ********** INITIALIZE AUDIO SOURCE ************
  ***********************************************
  ***********************************************/
-audioSource *initAudioSource(char *filename)
+audioSource *initAudioSource(char *filename, int azimuth)
 {
 	audioSource *newSrc = (audioSource*)malloc(sizeof(audioSource));
 	return newSrc;
