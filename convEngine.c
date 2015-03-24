@@ -74,7 +74,8 @@ typedef struct
 	// hold the input audio for playback
     double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
 
-	int numConv; //number of convolutions performed
+	int numConv; // number of convolutions performed
+	int numSrcs; // number of audio sources
 
     double ampScal;
     double ampScal2;
@@ -95,7 +96,7 @@ typedef struct
 audioSource *SOURCE_BUFFER[MAX_SOURCES];
 
 audioSource *initAudioSource(char *filename, int azimuth);
-void initAudioData(char *filename, paData *data, int az, int elev);
+void initAudioData(char *filename, paData *data, int az, int elev, int numSources);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
 void initBuffers()
@@ -263,7 +264,7 @@ int main( int argc, char **argv ) {
     audioFilename = argv[3];
     
     //Open audio file to play
-	initAudioData(audioFilename, &data, 0, 0);
+	initAudioData(audioFilename, &data, 0, 0, numAudioSrc);
 
 	// Initialize pair of impulse responses
     initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
@@ -456,7 +457,7 @@ audioSource *initAudioSource(char *filename, int azimuth)
  ***********************************************
  ***********************************************/
 
-void initAudioData(char *filename, paData *data, int az, int elev)
+void initAudioData(char *filename, paData *data, int az, int elev, int numSources)
 {
     SNDFILE *audioFile;
     SF_INFO audioData;
@@ -473,6 +474,7 @@ void initAudioData(char *filename, paData *data, int az, int elev)
     
     data->azimuth = az;
     data->elevation = elev;
+    data->numSrcs = numSources;
 }
 
 /*********************************************** 
