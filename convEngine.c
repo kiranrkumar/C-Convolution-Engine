@@ -255,7 +255,7 @@ int main( int argc, char **argv ) {
 		randTmp = rand() % 360;
 		randTmp -= (randTmp % 5) + 5;
     	SOURCE_BUFFER[i] = initAudioSource(argv[i + 3], randTmp);
-    	printf("Random azimuth number is %d\n", randTmp);
+    	//printf("Random azimuth number is %d\n", randTmp);
     }
 
     leftIRfilename = argv[1];
@@ -434,6 +434,20 @@ int main( int argc, char **argv ) {
 audioSource *initAudioSource(char *filename, int azimuth)
 {
 	audioSource *newSrc = (audioSource*)malloc(sizeof(audioSource));
+
+	SNDFILE *audioFile;
+    SF_INFO audioData;
+
+    if ((audioFile = sf_open(filename, SFM_READ, &audioData)) == NULL ) 
+    {
+        printf("Error, could not open audio file%s.\n", filename);
+        puts(sf_strerror(NULL));
+        return NULL;
+    }
+	newSrc->azimuth = azimuth;
+	newSrc->srcFile = audioFile;
+	newSrc->srcInfo = &audioData;
+	
 	return newSrc;
 }
 /*********************************************** 
