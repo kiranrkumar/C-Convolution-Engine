@@ -1,10 +1,11 @@
+# Kiran Kumar
 #
 # Makefile
-# Lab 9
+# Real-Time Convolution Engine
 #
 
 CC      = gcc
-CFLAGS  = -g -std=c99 -Wall -I/usr/local/djbfft/include
+CFLAGS  = -g -std=c99 -Wall
 LIBS = -lportaudio -lsndfile -lfftw3 -lncurses
 
 EXE  = convEngine
