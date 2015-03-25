@@ -119,7 +119,7 @@ static int paCallback( const void *inputBuffer,
         PaStreamCallbackFlags statusFlags, void *userData ) 
 {
     
-    int readcount, i;
+    int readcount, i, srcIx;
     static int resultIxLeft = 0, resultIxRight = 0;
 
     static int irIx = 0; //index for where we are in the impulse response
@@ -129,84 +129,111 @@ static int paCallback( const void *inputBuffer,
     float *out = (float*) outputBuffer;
     paData *data = (paData*) userData;
 
-    // IMPORTANT - Read frames of double type into our buffer for playback
-    readcount = sf_readf_double(data->infile, data->file_buff, framesPerBuffer);
-
-    // IMPORTANT - If we're at the end of the file, let's start again
-    if ( readcount < framesPerBuffer) 
+	// Process each audio source
+    for (srcIx = 0; srcIx < data->numSrcs; srcIx++)
     {
-        sf_seek(data->infile, 0, SEEK_SET);
-        readcount = sf_readf_double(data->infile, data->file_buff + readcount, framesPerBuffer - readcount);
-    }
+        // IMPORTANT - Read frames of double type into our buffer for playback
+	    readcount = sf_readf_double(SOURCE_BUFFER[srcIx]->srcFile, data->file_buff, framesPerBuffer);
     
-    /**** Declare variables ****/
-    
-	int convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
-	int convSigLenRight = framesPerBuffer + data->irRight_len - 1;
-	int maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
+		// IMPORTANT - If we're at the end of the file, let's start again
+		if ( readcount < framesPerBuffer) 
+		{
+			sf_seek(data->infile, 0, SEEK_SET);
+			readcount = sf_readf_double(data->infile, data->file_buff + readcount, framesPerBuffer - readcount);
+		}
+	
+		/**** Declare variables ****/
+	
+		int convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
+		int convSigLenRight = framesPerBuffer + data->irRight_len - 1;
+		int maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
 
-    //hold time domain audio and IR signals
-    double *inLeft = fftw_malloc(sizeof(double) * maxLen );
-    double *inRight = fftw_malloc(sizeof(double) * maxLen );
-    double *inIRLeft = fftw_malloc(sizeof(double) * maxLen );
-    double *inIRRight = fftw_malloc(sizeof(double) * maxLen );
-    double *convolvedSigLeft;
-    double *convolvedSigRight;
+		//hold time domain audio and IR signals
+		double *inLeft = fftw_malloc(sizeof(double) * maxLen );
+		double *inRight = fftw_malloc(sizeof(double) * maxLen );
+		double *inIRLeft = fftw_malloc(sizeof(double) * maxLen );
+		double *inIRRight = fftw_malloc(sizeof(double) * maxLen );
+		double *convolvedSigLeft;
+		double *convolvedSigRight;
 
 
-	//Store samples into in and inIR buffers
-    for (i = 0; i < maxLen; i++)
-    {
-        inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
-        inRight[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
+		//Store samples into in and inIR buffers
+		for (i = 0; i < maxLen; i++)
+		{
+			inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
+			inRight[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
 
-        inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
-        inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
-    }
-    
-    // Convolve signals via convolution function
-    convolve(inLeft, framesPerBuffer, inIRLeft, data->irLeft_len, &convolvedSigLeft);
-    convolve(inRight, framesPerBuffer, inIRRight, data->irRight_len, &convolvedSigRight);
-    
-    /********************************************
-     **** COPY DATA INTO APPROPRIATE BUFFERS ****
-    *********************************************/
-    for (i = 0; i < maxLen; i++)
-    {  
-       //Normalized convolved signals
-       convolvedSigLeft[i] = (i < convSigLenLeft) ? (convolvedSigLeft[i] /(double)convSigLenLeft) : 0;
-       convolvedSigRight[i] = (i < convSigLenRight) ? (convolvedSigRight[i] /(double)convSigLenRight) : 0;
+			inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
+			inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
+		}
+	
+		// Convolve signals via convolution function
+		convolve(inLeft, framesPerBuffer, inIRLeft, data->irLeft_len, &convolvedSigLeft);
+		convolve(inRight, framesPerBuffer, inIRRight, data->irRight_len, &convolvedSigRight);
+	
+		/********************************************
+		 **** COPY DATA INTO APPROPRIATE BUFFERS ****
+		*********************************************/
+		for (i = 0; i < maxLen; i++)
+		{  
+			// zero the output buffers if we're on the first audio source of this callback
+		   if (srcIx == 0)
+		   {
+		   		out[2*i] = 0;
+		   		out[2*i + 1] = 0;
+		   }
+		   //Normalized convolved signals
+		   convolvedSigLeft[i] = (i < convSigLenLeft) ? (convolvedSigLeft[i] /(double)convSigLenLeft) : 0;
+		   convolvedSigRight[i] = (i < convSigLenRight) ? (convolvedSigRight[i] /(double)convSigLenRight) : 0;
 
-       RESULTBUFFER_LEFT[(resultIxLeft) % BUFFERSIZE_MAX] += convolvedSigLeft[i];
-       RESULTBUFFER_RIGHT[(resultIxRight) % BUFFERSIZE_MAX] += convolvedSigRight[i];
-       
-       if (i < framesPerBuffer)
-       {
-		   //store result buffer values into output
-	       out[2*i] = (float) RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX];
-	       out[2*i + 1] = (float) RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX];
-	       
-	       //zero out the result buffer value so that the index can be used again the next loop around
-	       RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX] = 0;
-	       RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX] = 0;
-       }
-       
-       resultIxLeft++;
-       resultIxRight++;
-    }
-    
-	resultIxLeft -= (convSigLenLeft - framesPerBuffer);
-	resultIxRight -= (convSigLenRight - framesPerBuffer);
+		   RESULTBUFFER_LEFT[(resultIxLeft) % BUFFERSIZE_MAX] += convolvedSigLeft[i];
+		   RESULTBUFFER_RIGHT[(resultIxRight) % BUFFERSIZE_MAX] += convolvedSigRight[i];
+	   
+		   if (i < framesPerBuffer)
+		   {
+			   
+
+			   if (srcIx == (data->numSrcs - 1) )
+			   {
+			   	   // store result buffer values into output
+				   out[2*i] = (float) RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX];
+				   out[2*i + 1] = (float) RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX];
+
+     			   // zero out the result buffer value so that the index can be used again the next loop around				   
+				   RESULTBUFFER_LEFT[resultIxLeft % BUFFERSIZE_MAX] = 0;
+				   RESULTBUFFER_RIGHT[resultIxRight % BUFFERSIZE_MAX] = 0;
+			   }
+		   }
+	   
+		   resultIxLeft++;
+		   resultIxRight++;
+		}
 		
-	/**** Free up allocated memory *******/
+		// Reset resultIx[Left/Right] depending on whether we're at the last audio source
+		if (srcIx == (data->numSrcs - 1) )
+		{
+			// if we're done with all sources, hop over one buffer size to prep for the next callback
+			resultIxLeft -= (maxLen - framesPerBuffer);
+			resultIxRight -= (maxLen - framesPerBuffer);
+		}
+		else
+		{
+			// otherwise, go back all the way and add future convolved sources to the output
+			resultIxLeft -= maxLen;
+			resultIxRight -= maxLen;
+		}
+		/**** Free up allocated memory *******/
 
-	//Free memory for all buffers
-    fftw_free(inLeft);
-    fftw_free(inRight);
-    fftw_free(inIRLeft);
-    fftw_free(inIRRight);
-   	fftw_free(convolvedSigLeft);
-    fftw_free(convolvedSigRight);
+		//Free memory for all buffers
+		fftw_free(inLeft);
+		fftw_free(inRight);
+		fftw_free(inIRLeft);
+		fftw_free(inIRRight);
+		fftw_free(convolvedSigLeft);
+		fftw_free(convolvedSigRight);
+		
+	}
+	// End of "each audio source" loop
 
     //update indices
     if (endOfIR) {
