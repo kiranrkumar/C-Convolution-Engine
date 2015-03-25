@@ -224,13 +224,13 @@ int main( int argc, char **argv ) {
 
     /* Check arguments */
     if ( argc != 4 ) {
-        printf("Usage: %s audio_filename.wav left_HRTF_filename.wav right_HRTF_filename.wav\n", argv[0]);
+        printf("Usage: %s left_HRTF_filename.wav right_HRTF_filename.wav audio_filename.wav \n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    audioFilename = argv[1];
-    leftIRfilename = argv[2];
-    rightIRfilename = argv[3];
+    leftIRfilename = argv[1];
+    rightIRfilename = argv[2];
+    audioFilename = argv[3];
     
     //Open audio file to play
 	initAudioData(audioFilename, &data, 0, 0);
