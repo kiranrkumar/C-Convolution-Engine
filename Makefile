@@ -10,9 +10,9 @@ LIBS = -lportaudio -lsndfile -lfftw3 -lncurses
 
 EXE  = convEngine
 
-HDRS = convolve.h
+HDRS = convolve.h 3dAudioPrep.h
 
-SRCS = convEngine.c convolve.c
+SRCS = convEngine.c convolve.c 3dAudioPrep.c
 
 all: $(EXE)
 

@@ -41,6 +41,7 @@
 #include <stdbool.h>
 #include <fftw3.h>
 #include "convolve.h"
+#include "3dAudioPrep.h"
 #include <ncurses.h>
 	
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
@@ -95,7 +96,7 @@ typedef struct
 
 audioSource *SOURCE_BUFFER[MAX_SOURCES];
 
-audioSource *initAudioSource(char *filename, int azimuth);
+audioSource *createAudioSource(char *filename, int azimuth);
 void initAudioData(char *filename, paData *data, int az, int elev, int numSources);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
@@ -122,13 +123,20 @@ static int paCallback( const void *inputBuffer,
     int readcount, i, srcIx;
     static int resultIxLeft = 0, resultIxRight = 0;
 
+
     static int irIx = 0; //index for where we are in the impulse response
     static bool endOfIR = false;
 
-    //Cast data to appropriate types
+    // Cast data to appropriate types
     float *out = (float*) outputBuffer;
     paData *data = (paData*) userData;
-
+    
+    /**** Declare other necessary variables ****/
+    int convSigLenLeft, convSigLenRight, maxLen;
+    
+    // time domain audio and IR signals
+	double *inLeft, *inRight, *inIRLeft, *inIRRight;
+    
 	// Process each audio source
     for (srcIx = 0; srcIx < data->numSrcs; srcIx++)
     {
@@ -138,24 +146,22 @@ static int paCallback( const void *inputBuffer,
 		// IMPORTANT - If we're at the end of the file, let's start again
 		if ( readcount < framesPerBuffer) 
 		{
-			sf_seek(data->infile, 0, SEEK_SET);
-			readcount = sf_readf_double(data->infile, data->file_buff + readcount, framesPerBuffer - readcount);
+			sf_seek(SOURCE_BUFFER[srcIx]->srcFile, 0, SEEK_SET);
+			readcount = sf_readf_double(SOURCE_BUFFER[srcIx]->srcFile, data->file_buff + readcount, framesPerBuffer - readcount);
 		}
 	
-		/**** Declare variables ****/
+		/**** Declare convolved signal variables ****/
+		double *convolvedSigLeft, *convolvedSigRight;
 	
-		int convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
-		int convSigLenRight = framesPerBuffer + data->irRight_len - 1;
-		int maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
+		convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
+		convSigLenRight = framesPerBuffer + data->irRight_len - 1;
+		maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
 
 		//hold time domain audio and IR signals
-		double *inLeft = fftw_malloc(sizeof(double) * maxLen );
-		double *inRight = fftw_malloc(sizeof(double) * maxLen );
-		double *inIRLeft = fftw_malloc(sizeof(double) * maxLen );
-		double *inIRRight = fftw_malloc(sizeof(double) * maxLen );
-		double *convolvedSigLeft;
-		double *convolvedSigRight;
-
+		inLeft = fftw_malloc(sizeof(double) * maxLen );
+		inRight = fftw_malloc(sizeof(double) * maxLen );
+		inIRLeft = fftw_malloc(sizeof(double) * maxLen );
+		inIRRight = fftw_malloc(sizeof(double) * maxLen );
 
 		//Store samples into in and inIR buffers
 		for (i = 0; i < maxLen; i++)
@@ -176,13 +182,7 @@ static int paCallback( const void *inputBuffer,
 		*********************************************/
 		for (i = 0; i < maxLen; i++)
 		{  
-			// zero the output buffers if we're on the first audio source of this callback
-		   if (srcIx == 0)
-		   {
-		   		out[2*i] = 0;
-		   		out[2*i + 1] = 0;
-		   }
-		   //Normalized convolved signals
+		   //Normalize convolved signals
 		   convolvedSigLeft[i] = (i < convSigLenLeft) ? (convolvedSigLeft[i] /(double)convSigLenLeft) : 0;
 		   convolvedSigRight[i] = (i < convSigLenRight) ? (convolvedSigRight[i] /(double)convSigLenRight) : 0;
 
@@ -191,8 +191,7 @@ static int paCallback( const void *inputBuffer,
 	   
 		   if (i < framesPerBuffer)
 		   {
-			   
-
+			   // check whether we're on the last audio source
 			   if (srcIx == (data->numSrcs - 1) )
 			   {
 			   	   // store result buffer values into output
@@ -282,7 +281,7 @@ int main( int argc, char **argv ) {
 		// Generate a random azimuth value - multiple of 5 to correspond with the HRTF filenames
 		randTmp = rand() % 360;
 		randTmp -= (randTmp % 5) + 5;
-    	SOURCE_BUFFER[i] = initAudioSource(argv[i + 3], randTmp);
+    	SOURCE_BUFFER[i] = createAudioSource(argv[i + 3], randTmp);
     	//printf("Random azimuth number is %d\n", randTmp);
     }
 
@@ -459,7 +458,7 @@ int main( int argc, char **argv ) {
  ********** INITIALIZE AUDIO SOURCE ************
  ***********************************************
  ***********************************************/
-audioSource *initAudioSource(char *filename, int azimuth)
+audioSource *createAudioSource(char *filename, int azimuth)
 {
 	audioSource *newSrc = (audioSource*)malloc(sizeof(audioSource));
 
