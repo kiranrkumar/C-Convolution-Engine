@@ -152,7 +152,6 @@ static int paCallback( const void *inputBuffer,
 	
 		/**** Declare convolved signal variables ****/
 		double *convolvedSigLeft, *convolvedSigRight;
-		//blarg
 	
 		convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
 		convSigLenRight = framesPerBuffer + data->irRight_len - 1;
