@@ -18,7 +18,7 @@
  */
 
 #define SAMPLE_RATE         44100
-#define FRAMES_PER_BUFFER   64
+#define FRAMES_PER_BUFFER   256
 #define NUM_IN_CHANNELS     1
 #define NUM_OUT_CHANNELS    2
 #define MAX_SOURCES			16
@@ -386,11 +386,14 @@ int main( int argc, char **argv ) {
     mvprintw(8, col/2, "%s%d", "Number of channels: ", rightIRdata.channels);
     mvprintw(9, col/2, "%s%d", "Number of frames: ", rightIRdata.frames);
 
-	mvprintw(2, 0, "%s%s", "Audio Signal: ", audioFilename);
-	mvprintw(3, 0, "%s%d", "Number of channels: ", data.sf_inInfo.channels);
-	mvprintw(4, 0, "%s%d", "Number of frames: ", data.sf_inInfo.frames);
+	for (i = 0; i < numAudioSrc; i++)
+	{
+		mvprintw(2, (col * i / numAudioSrc), "%s%s", "Audio Signal: ", argv[i + 3]);
+		mvprintw(3, (col * i / numAudioSrc), "%s%d", "Number of channels: ", SOURCE_BUFFER[i]->srcInfo->channels);
+		mvprintw(4, (col * i / numAudioSrc), "%s%d", "Number of frames: ", SOURCE_BUFFER[i]->srcInfo->frames);
+	}
 	
-    mvprintw(row/2 - 5, 0, "%s", "Type 'q' to quit: ");
+	mvprintw(row/2 - 5, 0, "%s", "Type 'q' to quit: ");
 	
 	refresh();
 
