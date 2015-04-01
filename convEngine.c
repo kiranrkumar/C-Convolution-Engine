@@ -141,8 +141,8 @@ static int paCallback( const void *inputBuffer,
 		/**** Declare convolved signal variables ****/
 		double *convolvedSigLeft, *convolvedSigRight;
 	
-		convSigLenLeft = framesPerBuffer + data->irLeft_len - 1;
-		convSigLenRight = framesPerBuffer + data->irRight_len - 1;
+		convSigLenLeft = framesPerBuffer + IR_BUFFER[srcIx]->left_len - 1;
+		convSigLenRight = framesPerBuffer + IR_BUFFER[srcIx]->right_len - 1;
 		maxLen = (convSigLenLeft > convSigLenRight) ? convSigLenLeft : convSigLenRight;
 
 		//hold time domain audio and IR signals
@@ -157,13 +157,13 @@ static int paCallback( const void *inputBuffer,
 			inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
 			inRight[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
 
-			inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
-			inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
+			inIRLeft[i] = (i < data->irLeft_len) ? IR_BUFFER[srcIx]->leftBuffer[i] : 0;
+			inIRRight[i] = (i < data->irRight_len) ? IR_BUFFER[srcIx]->rightBuffer[i] : 0;
 		}
 	
 		// Convolve signals via convolution function
-		convolve(inLeft, framesPerBuffer, inIRLeft, data->irLeft_len, &convolvedSigLeft);
-		convolve(inRight, framesPerBuffer, inIRRight, data->irRight_len, &convolvedSigRight);
+		convolve(inLeft, framesPerBuffer, inIRLeft, IR_BUFFER[srcIx]->left_len, &convolvedSigLeft);
+		convolve(inRight, framesPerBuffer, inIRRight, IR_BUFFER[srcIx]->left_len, &convolvedSigRight);
 	
 		/********************************************
 		 **** COPY DATA INTO APPROPRIATE BUFFERS ****
