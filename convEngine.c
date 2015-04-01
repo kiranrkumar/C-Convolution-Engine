@@ -94,9 +94,24 @@ typedef struct
 	int elevation;
 } audioSource;
 
+typedef struct
+{
+	SF_INFO left_info;
+	SF_INFO right_info;
+	
+	int left_len;
+	int right_len;
+	
+	double *leftBuffer;
+	double *rightBuffer;
+} impulseResponse;
+
+// create global buffers of audio sources and impulse responses
 audioSource *SOURCE_BUFFER[MAX_SOURCES];
+impulseResponse *IR_BUFFER[MAX_SOURCES];
 
 audioSource *createAudioSource(char *filename, int azimuth);
+impulseResponse *createImpulseResponse(char *leftIRfilename, char *rightIRfilename);
 void initAudioData(char *filename, paData *data, int az, int elev, int numSources);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
@@ -273,16 +288,20 @@ int main( int argc, char **argv ) {
         return EXIT_FAILURE;
     }
     
-    numAudioSrc = argc - 3;
+    numAudioSrc = (argc - 3);
     
-	// create an audio source for each source filename passed in
+	// create audio sources and impulse responses
     for (i = 0; i < numAudioSrc; i++)
     {
 		// Generate a random azimuth value - multiple of 5 to correspond with the HRTF filenames
 		randTmp = rand() % 360;
 		randTmp -= (randTmp % 5) + 5;
+
+		// create a new audio source for each filename passed in
     	SOURCE_BUFFER[i] = createAudioSource(argv[i + 3], randTmp);
-    	//printf("Random azimuth number is %d\n", randTmp);
+
+    	// REPLACE LATER!!!! - For now, create a new impulseResponse object for the same two filenames
+    	IR_BUFFER[i] = createImpulseResponse(argv[1], argv[2]);
     }
 
     leftIRfilename = argv[1];
@@ -458,7 +477,7 @@ int main( int argc, char **argv ) {
 
 /*********************************************** 
  *********************************************** 
- ********** INITIALIZE AUDIO SOURCE ************
+ ********** CREATE NEW AUDIO SOURCE ************
  ***********************************************
  ***********************************************/
 audioSource *createAudioSource(char *filename, int azimuth)
@@ -479,6 +498,58 @@ audioSource *createAudioSource(char *filename, int azimuth)
 	newSrc->srcInfo = &audioData;
 	
 	return newSrc;
+}
+/*********************************************** 
+ *********************************************** 
+ ******** CREATE NEW IMPULSE RESPONSES *********
+ ***********************************************
+ ***********************************************/
+impulseResponse *createImpulseResponse(char *leftIRfilename, char *rightIRfilename)
+{
+	impulseResponse *newIR = (impulseResponse*)malloc(sizeof(impulseResponse));
+
+	SNDFILE *leftFile, *rightFile;
+    SF_INFO leftInfo, rightInfo;
+    double *left_Buffer, *right_Buffer;
+	int leftLen, rightLen;
+
+	// Open left IR
+    if ((leftFile = sf_open(leftIRfilename, SFM_READ, &leftInfo)) == NULL ) 
+    {
+        printf("Error, could not open left IR%s.\n", leftIRfilename);
+        puts(sf_strerror(NULL));
+        return NULL;
+    }
+
+	// Open right IR    
+    if ((rightFile = sf_open(rightIRfilename, SFM_READ, &rightInfo)) == NULL ) 
+    {
+        printf("Error, could not open left IR%s.\n", rightIRfilename);
+        puts(sf_strerror(NULL));
+        return NULL;
+    }
+    
+	leftLen = leftInfo.channels * leftInfo.frames;
+	rightLen = rightInfo.channels * rightInfo.frames;
+	
+	// Create IR double buffers
+    left_Buffer = (double *)malloc(leftLen * sizeof(double));
+    right_Buffer = (double *)malloc(rightLen * sizeof(double));
+	
+    // Read info from SF_INFO structs into the IR buffers
+    sf_readf_double(leftFile, left_Buffer, leftInfo.frames);
+    sf_readf_double(rightFile, right_Buffer, rightInfo.frames);
+    
+	newIR->left_info = leftInfo;
+	newIR->right_info = rightInfo;
+	
+	newIR->left_len = leftLen;
+	newIR->right_len = rightLen;
+    
+    newIR->leftBuffer = left_Buffer;
+    newIR->rightBuffer = right_Buffer;
+	
+	return newIR;
 }
 /*********************************************** 
  *********************************************** 
