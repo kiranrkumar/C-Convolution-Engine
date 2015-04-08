@@ -257,7 +257,7 @@ int main( int argc, char **argv ) {
 	
     /* Check arguments */
     if ( argc < 4 ) {
-        printf("Usage: %s left_HRTF_filename.wav right_HRTF_filename.wav audio_filename.wav [additional_audio_filename(s).wav]\n", argv[0]);
+        printf("Usage: %s left_HRTF_filename.wav right_HRTF_filename.wav audio_filename.wav [leftHRTF2.wav rightHRTF2.wav audio2.wav ....]\n", argv[0]);
         return EXIT_FAILURE;
     }
     
