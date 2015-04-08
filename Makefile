@@ -12,7 +12,7 @@ EXE  = convEngine
 
 HDRS = convolve.h
 
-SRCS = convEngine.c convolve.c testMSPpatch.c
+SRCS = convEngine.c convolve.c
 
 all: $(EXE)
 
