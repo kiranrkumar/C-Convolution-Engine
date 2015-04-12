@@ -16,4 +16,8 @@
 #include <fftw3.h>
 
 
+//convolve two signals
 void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **convolvedSig);
+
+//deconvolve a fully convolved signal
+void deconvolve(double *convolvedSig, int convSigLen, double *sigOne, int lenOne, double **outputSig);

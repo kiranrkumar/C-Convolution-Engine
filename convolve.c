@@ -20,7 +20,7 @@
 ************************************ convolve *************************************
 ***********************************************************************************
 ** Parameters:
-**		sigOne:			the first of the two audio signals to convolve (e.g. the dry audio)/
+**		sigOne:			the first of the two audio signals to convolve (e.g. the dry audio)
 **		lenOne:			length of the first audio signal
 **		sigTwo:			the second of the two signals to convolve (e.g. the impulse response)
 **		lenTwo:			length of the second audio signal
@@ -30,7 +30,7 @@ void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **c
 {
 	int i;
 	int convSigLen = lenOne + lenTwo - 1;
-	int nc = convSigLen/2 + 1;
+	int nc = convSigLen/2 + 1; // FFTW doesn't output the redundant half of the FFT
 	
 	//Hold the initial signals
 	double *sigOnePadded = fftw_malloc(sizeof(double) * convSigLen);
@@ -73,9 +73,12 @@ void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **c
 	
 	*convolvedSig = fftw_malloc(sizeof(double) * convSigLen);
 
+	//create and execute IFFT (backward FFT) plan
 	backward_convolution = fftw_plan_dft_c2r_1d(convSigLen, fftMulti, *convolvedSig, FFTW_ESTIMATE);
 	fftw_execute(backward_convolution);
 	
+	
+	//destroy plans and free up allocated memory
 	fftw_destroy_plan(forward_sigOne);
 	fftw_destroy_plan(forward_sigTwo);
 	fftw_destroy_plan(backward_convolution);
@@ -85,4 +88,18 @@ void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **c
 	fftw_free(outfftwOne);
 	fftw_free(outfftwTwo);
 	fftw_free(fftMulti);
+}
+
+/**********************************************************************************
+*********************************** deconvolve ************************************
+***********************************************************************************
+** Parameters:
+**		convolvedSig:	the fully convolved signal we wish to deconstruct
+**		convSigLen:		length of the fully convolved signal
+**		sigOne:			one of the two signals that were convolved to produce convolvedSig
+**		lenOne:			length of sigOne
+**		outputSig:		UNALLOCATED buffer to hold the output signal
+***********************************************************************************/
+void deconvolve(double *convolvedSig, int convSigLen, double *sigOne, int lenOne, double **outputSig)
+{
 }

@@ -45,6 +45,15 @@ typedef struct _conv
 
 static t_class *s_conv_class; // global pointer to our class definition that is setup in main()
 
+/* 
+	Specify the signal processing function your object defines along with its arguments. 
+	Called when the MSP signal compiler is building a sequence of operations 
+	(known as the DSP Chain) that will be performed on each set of audio samples. 
+	The operation sequence consists of a pointers to functions (called perform routines) 
+	followed by arguments to those functions.
+*/
+void mydspobject_dsp(t_mydspobject *x, t_signal **sp, short *count);
+
 int main()
 {
 	t_class *c;
@@ -160,4 +169,92 @@ void conv_bang(t_conv *x)
 void conv_float(t_conv *x, double f)
 {
 	post("got a float and it is %.2f", f);
+}
+
+/****************************************************************************************
+ ******************************** mydspobject_dsp ***************************************
+ ****************************************************************************************
+ * 	Specify the signal processing function your object defines along with its arguments. 
+ *	Called when the MSP signal compiler is building a sequence of operations 
+ *	(known as the DSP Chain) that will be performed on each set of audio samples. 
+ *	The operation sequence consists of a pointers to functions (called perform routines) 
+ *	followed by arguments to those functions.
+ ****************************************************************************************
+ * PARAMETERS:
+ *			*x (t_mydspobject) - pointer to the signal processing object
+ *						  functions
+ *			**sp (t_signal) - pointer to an array of t_signal object pointers. Two important
+ *							  elements in t_signal are:
+ *							  - s_n = size of the signal vector
+ *							  - s_vec = the actual signal data in a 32-bit float array
+ *
+ *							  sp has the inputs and outputs. E.g., for 2 inputs and 3 outputs,
+ *							  it would look like this:
+									sp[0] // left input
+									sp[1] // right input
+									sp[2] // left output
+									sp[3] // middle output
+									sp[4] // right output 
+ *			*count (short) - 
+ *****************************************************************************************
+ * RETURNS: 	<nothing>
+ *****************************************************************************************/
+void mydspobject_dsp(t_mydspobject *x, t_signal **sp, short *count)
+{
+
+}
+
+
+/*
+Use dsp_add() to add an entry to the signal chain. Can use multiple strategies. For simple
+unit generators not storing internal state between computing vectors, you can just pass the 
+inputs, outputs, and vector size. For objects that need to store internal state between 
+computing vectors (e.g. filters or ramp generators), you will pass a pointer to your object, 
+whose data structure should contain space to store this state.
+
+The plus1~ object below does not need to store internal state. It passes the input, output, 
+and vector size to its perform routine. The plus1~ dsp method is shown below:
+*/
+void plus1_dsp(t_plus1 *x, t_signal **sp, short *count)
+{
+	/* dsp_add arguments
+			- perform routine
+			- number of arguments
+			- the arguments themselves
+	*/
+	dsp_add(plus1_perform, 3, sp[0]->s_vec, sp[1]->s_vec, sp[0]->s_n);
+}
+
+/*The perform routine is not a "method" in the traditional sense. It will be called 
+within the callback of an audio driver, which, unless the user is employing the Non-Real 
+Time audio driver, will typically be in a high-priority thread. Thread protection inside 
+the perform routine is minimal. You can use a clock, but you cannot use qelems or outlets.
+The design of the perform routine is somewhat unlike other Max methods. It receives a 
+pointer to a piece of the DSP chain and it is expected to return the location of the next 
+perform routine on the chain. The next location is determined by the number of arguments 
+you specified for your perform routine with your call to dsp_add(). For example, if you 
+will pass three arguments, you need to return w + 4.*/
+t_int *plus1_perform(t_int *w)
+{
+	t_float *in, *out;
+	int n;
+
+	in = (t_float *)w[1];       // get input signal vector
+	out = (t_float *)w[2];      // get output signal vector
+	n = (int)w[3];          // vector size
+
+
+	while (n--)         // perform calculation on all samples
+		*out++ = *in++ + 1.;
+
+	return w + 4;           // must return next DSP chain location
+}
+
+/* The free function for the class must either be dsp_free() or it must be written to 
+call dsp_free() as below: */
+void mydspobject_free(t_mydspobject *x)
+{
+	dsp_free((t_pxobject *)x);
+
+	// can do other stuff here
 }
