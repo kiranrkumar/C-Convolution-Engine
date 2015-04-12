@@ -19,6 +19,9 @@ To Run the Code ('1-Source' branch only!!):
 
 Updates:
 
+April 11, 2015:
+  - Added testMSPPatch.c to begin moving the 1-Source code to a Max/MSP patch for use with Kevin (Zhiyuan)'s existing Max patch. Currently contains code from Cycling tutorials - will need to explore the API and instructions for compiling and building the actual patch in XCode
+
 March 24, 2015:
   - So far, the "1-Source" branch allows for input of a single sound source and a choice of left & right HRTFs. It convolves a 4 1/2 minute song file with 512-sample HRTFs with no time lag or artifacts using a 64-sample buffer size in the audio callback
   - Am current modifying the code in the "Multi-Source" branch to allow for multiple audio source inputs. With the restructing, the program sometimes runs but other times produces either a seg fault or memory allocation error. Currently investigating.
