@@ -26,22 +26,16 @@ typedef struct _conv
 	char *rightHRTFfilename // yet another something else
 } t_conv;
 
-/****** Initialization Routine *********/
-/* 
-	The initialization routine, which must be called main, 
-	is called when Max loads your object for the first time. 
-	In the initialization routine, you define one or more classes. 
-	Defining a class consists of the following:
 
-		1) telling Max about the size of your object's structure 
-			and how to create and destroy an instance 
-		2) defining methods that implement the object's behavior 
-		3) in some cases, defining attributes that describe the object's data 
-		4) registering the class in a name space 
-
-	
-	Example:
-*/
+// declare functions
+void *conv_new();
+void conv_int(t_conv *x, long n);
+void conv_bang(t_conv *x);
+void conv_float(t_conv *x, double f);
+void mydspobject_dsp(t_mydspobject *x, t_signal **sp, short *count);
+void plus1_dsp(t_plus1 *x, t_signal **sp, short *count);
+t_int *plus1_perform(t_int *w);
+void mydspobject_free(t_mydspobject *x);
 
 static t_class *s_conv_class; // global pointer to our class definition that is setup in main()
 
@@ -54,12 +48,28 @@ static t_class *s_conv_class; // global pointer to our class definition that is 
 */
 void mydspobject_dsp(t_mydspobject *x, t_signal **sp, short *count);
 
-int main()
+/****** Initialization Routine *********/
+/*
+	The initialization routine, which must be called main,
+	is called when Max loads your object for the first time.
+	In the initialization routine, you define one or more classes.
+	Defining a class consists of the following:
+ 
+ 1) telling Max about the size of your object's structure
+ and how to create and destroy an instance
+ 2) defining methods that implement the object's behavior
+ 3) in some cases, defining attributes that describe the object's data
+ 4) registering the class in a name space
+ 
+	
+	Example:
+ */
+int main(void)
 {
 	t_class *c;
 
 	//create a new instance of the class
-	c = class_new("conv", (method)conv_new, (method)dsp_free, sizeof(t_conv), 0L, 0); 
+	c = class_new("conv~", (method)conv_new, (method)dsp_free, sizeof(t_conv), 0L, 0);
 	//dsp_free (or some free function) is required for MSP
 	
 	/* add some standard method handlers for internal messages used by 
@@ -68,13 +78,10 @@ int main()
 	
 	//add method that is bound to the 'dsp' symbol
 	class_addmethod(c, (method)mydspobject_dsp, "dsp", A_CANT, 0);
-	
 	//integer message sent to the object
-	class_addmethod(c, (method)conv_int, "int", A_LONG, 0); 
-
+	class_addmethod(c, (method)conv_int, "int", A_LONG, 0);
 	//bang message sent to the object
-	class_addmethod(c, (method)conv_bang, "bang", 0); 
-
+	class_addmethod(c, (method)conv_bang, "bang", 0);
 	//float message sent to the object
 	class_addmethod(c, (method)conv_float, "float", A_FLOAT, 0); 
 
