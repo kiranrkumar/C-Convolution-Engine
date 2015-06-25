@@ -41,11 +41,12 @@
 #include "convolve.h"
 #include <ncurses.h>
 
+
+//hold the result of convolution for each output audio channel
 double RESULTBUFFER_LEFT[BUFFERSIZE_MAX];
 double RESULTBUFFER_RIGHT[BUFFERSIZE_MAX];
 
-
-
+//audio data struct for PortAudio callback
 typedef struct 
 {
     //input file - what will be looping on playback
@@ -60,26 +61,19 @@ typedef struct
     SF_INFO irLeft_info;
     SF_INFO irRight_info;
 
+    //length of the impulse responses
     int irLeft_len;
     int irRight_len;
     
     double *irLeftBuffer;
     double *irRightBuffer;
 
-	// positions in 3-D space
-	int azimuth; //should be between 0 and 360
-	int elevation; //should be between -90 and 90 (theoretically)
-
-	// hold the input audio for playback
+	//hold the input audio for playback
     double file_buff[NUM_IN_CHANNELS * FRAMES_PER_BUFFER];
-
-	int numConv; //number of convolutions performed
-
-    double ampScal;
-    double ampScal2;
+    
 } paData;
 
-void initAudioData(char *filename, paData *data, int az, int elev);
+void initAudioData(char *filename, paData *data);
 void initIRPair(char *leftFilename, SF_INFO *leftIR, char *rightFilename, SF_INFO *rightIR, paData *data);
 
 void initBuffers()
@@ -112,10 +106,10 @@ static int paCallback( const void *inputBuffer,
     float *out = (float*) outputBuffer;
     paData *data = (paData*) userData;
 
-    // IMPORTANT - Read frames of double type into our buffer for playback
+    //Read frames of 'double' type into our buffer for playback
     readcount = sf_readf_double(data->infile, data->file_buff, framesPerBuffer);
 
-    // IMPORTANT - If we're at the end of the file, let's start again
+    //If we're at the end of the file, let's start from the beginning again
     if ( readcount < framesPerBuffer) 
     {
         sf_seek(data->infile, 0, SEEK_SET);
@@ -140,14 +134,16 @@ static int paCallback( const void *inputBuffer,
 	//Store samples into in and inIR buffers
     for (i = 0; i < maxLen; i++)
     {
-        inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
-        inRight[i] = (i < framesPerBuffer) ? data->file_buff[i]: 0;
+        inLeft[i] = (i < framesPerBuffer) ? data->file_buff[i] : 0;
+        inRight[i] = (i < framesPerBuffer) ? data->file_buff[i] : 0;
 
         inIRLeft[i] = (i < data->irLeft_len) ? data->irLeftBuffer[i] : 0;
         inIRRight[i] = (i < data->irRight_len) ? data->irRightBuffer[i] : 0;
     }
     
-    // Convolve signals via convolution function
+    /***************************************************
+     **** Convolve signals via convolution function ****
+     ***************************************************/
     convolve(inLeft, framesPerBuffer, inIRLeft, data->irLeft_len, &convolvedSigLeft);
     convolve(inRight, framesPerBuffer, inIRRight, data->irRight_len, &convolvedSigRight);
     
@@ -233,7 +229,7 @@ int main( int argc, char **argv ) {
     audioFilename = argv[3];
     
     //Open audio file to play
-	initAudioData(audioFilename, &data, 0, 0);
+	initAudioData(audioFilename, &data);
 
 	// Initialize pair of impulse responses
     initIRPair(leftIRfilename, &leftIRdata, rightIRfilename, &rightIRdata, &data);
@@ -242,11 +238,6 @@ int main( int argc, char **argv ) {
     /*************************************
     ** Initiate Port Audio data values ***
     **************************************/
-    
-
-	// Scaling factors
-    data.ampScal = .5;
-    data.ampScal2 = .1;
 
     /* Setup sfinfo for output audio file */
     memset(&data.sf_outinfo, 0, sizeof(SF_INFO));
@@ -302,7 +293,7 @@ int main( int argc, char **argv ) {
         printf(  "PortAudio error: start stream: %s\n", Pa_GetErrorText(err));
     }
     
-    data.numConv = 0;
+    //data.numConv = 0;
 
 	/***********************************
      *********** USER INPUT*************
@@ -339,27 +330,7 @@ int main( int argc, char **argv ) {
 
     while (ch != 'q') {
 
-        switch (ch)
-        {
-        	case 65:
-        		if ( (data.elevation + ELE_INC) <= ELE_MAX)
-	        		data.elevation = (data.elevation + 5);
-        		break;
-        	case 66:
-	        	if ( (data.elevation - ELE_INC) >= ELE_MIN)
-		        	data.elevation = (data.elevation - 5);
-        		break;
-        	case 67:
-	        	data.azimuth = (data.azimuth + 360 + 5) % 360;
-        		break;
-        	case 68:
-	        	data.azimuth = (data.azimuth + 360 - 5) % 360;
-        		break;	
-        }
-        mvprintw(row/2, 0, "%s%5d", "Azimuth: ", data.azimuth);
-        mvprintw(row/2 + 1, 0, "%s%5d", "Elevation: ", data.elevation);
         mvprintw(row/2 + 2, 0, "%s%c", "Typed character: ", ch);
-        //mvprintw(row/2 + 3, 0, "%s%d", "Character length?...", strlen(&ch));
         refresh();
         ch = getchar();
     }
@@ -369,7 +340,7 @@ int main( int argc, char **argv ) {
     
 
 	/***********************************
-     *********END USER INPUT************
+     ********* </USER INPUT> ************
      ***********************************/
      
     err = Pa_StopStream(stream);
@@ -401,7 +372,7 @@ int main( int argc, char **argv ) {
  ***********************************************
  ***********************************************/
 
-void initAudioData(char *filename, paData *data, int az, int elev)
+void initAudioData(char *filename, paData *data)
 {
     SNDFILE *audioFile;
     SF_INFO audioData;
@@ -416,8 +387,6 @@ void initAudioData(char *filename, paData *data, int az, int elev)
     data->sf_inInfo = audioData;
     data->infile = audioFile;
     
-    data->azimuth = az;
-    data->elevation = elev;
 }
 
 /*********************************************** 

@@ -3,7 +3,7 @@
  **
  ** Kiran Kumar		March 8, 2015
  **
- ** Function that convolves two signals based on the fftw library
+ ** Function that convolves two signals based on the fftw3 library
  **
  */
 
@@ -20,10 +20,10 @@
 ************************************ convolve *************************************
 ***********************************************************************************
 ** Parameters:
-**		sigOne:			the first of the two audio signals to convolve (e.g. the dry audio)
-**		lenOne:			length of the first audio signal
-**		sigTwo:			the second of the two signals to convolve (e.g. the impulse response)
-**		lenTwo:			length of the second audio signal
+**		sigOne:			audio signal one (e.g. the dry audio)
+**		lenOne:			length in samples - first audio signal
+**		sigTwo:			audio signal two (e.g. impulse response)
+**		lenTwo:			length in samples - second audio signal
 **		convolvedSig:	UNALLOCATED buffer to hold the convolved signal
 ***********************************************************************************/
 void convolve(double *sigOne, int lenOne, double *sigTwo, int lenTwo, double **convolvedSig)
