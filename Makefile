@@ -1,10 +1,10 @@
 #
 # Makefile
-# Lab 9
+# Convolution Engine
 #
 
 CC      = gcc
-CFLAGS  = -g -std=c99 -Wall -I/usr/local/djbfft/include -I/Applications/Max6/max6-sdk-master/c74support/max-includes -I/Applications/Max6/max6-sdk-master/c74support/msp-includes
+CFLAGS  = -g -std=c99 -Wall 
 
 LIBS = -lportaudio -lsndfile -lfftw3 -lncurses
 
